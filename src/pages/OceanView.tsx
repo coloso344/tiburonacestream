@@ -222,7 +222,7 @@ const OceanView = () => {
     const base = String(rawUrl).trim();
     const normalizedUrl = /^https?:\/\//i.test(base) ? base : `http://${base}`;
 
-    const PROXY_URL = "https://pacifier-uplifting-eskimo.ngrok-free.dev";
+    const PROXY_URL = "http://[2806:10ae:1a:d5b4:3877:8cec:a8c5:c7c2]:3000";
 
     const proxyStreamUrl = `${PROXY_URL}/stream?server_url=${encodeURIComponent(normalizedUrl)}&username=${encodeURIComponent(selectedXtream.username)}&password=${encodeURIComponent(selectedXtream.password)}&stream_id=${channel.stream_id}`;
 
