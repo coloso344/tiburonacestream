@@ -231,7 +231,7 @@ export default function UniversalPlayer() {
 
     const channels = data.map((stream: any) => ({
       name: stream.name,
-      url: `https://newton-unto-fork-dolls.trycloudflare.com/stream-hls?server_url=${encodeURIComponent(playlist.server_url)}&username=${playlist.username}&password=${playlist.password}&stream_id=${stream.stream_id}`,
+      url: `https://nice-funk-owen-liberty.trycloudflare.com/stream-hls?server_url=${encodeURIComponent(playlist.server_url)}&username=${playlist.username}&password=${playlist.password}&stream_id=${stream.stream_id}`,
       group: stream.category_name
     }));
 
