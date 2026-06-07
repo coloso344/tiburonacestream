@@ -47,22 +47,68 @@ export default function UniversalPlayer() {
       hlsRef.current.destroy();
     }
 
-    // Configurar HLS.js con buffer optimizado
+    // Configurar HLS.js con buffer SUPER optimizado para streams en vivo
     if (Hls.isSupported()) {
       const hls = new Hls({
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        maxBufferSize: 60 * 1000 * 1000,
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 2,
-        nudgeMaxRetry: 5,
-        enableWorker: true,
-        lowLatencyMode: false,
-        backBufferLength: 30,
+        // BUFFER MÁS GRANDE
+        maxBufferLength: 60,           // 60 segundos de buffer
+        maxMaxBufferLength: 120,       // Máximo 120 segundos
+        maxBufferSize: 100 * 1000 * 1000, // 100MB en memoria
+        
+        // TOLERANCIA A ERRORES
+        maxBufferHole: 1.0,            // Más tolerante a huecos
+        maxFragLookUpTolerance: 0.25,  // Tolerancia al buscar fragments
+        highBufferWatchdogPeriod: 3,   // Vigila cada 3 segundos
+        nudgeMaxRetry: 10,             // Reintenta 10 veces
+        
+        // RENDIMIENTO
+        enableWorker: true,            // Usa Web Workers
+        enableSoftwareAES: true,       // Decodificación por software
+        lowLatencyMode: false,         // DESACTIVADO para más estabilidad
+        backBufferLength: 60,          // Mantiene 60s de historial
+        
+        // CALIDAD
+        startLevel: 0,                 // Empieza en calidad baja
+        capLevelToPlayerSize: true,    // Ajusta calidad al tamaño del video
+        testBandwidth: false,          // No prueba ancho de banda inicial
+        
+        // RECONEXIÓN
+        manifestLoadingTimeOut: 20000,     // 20s timeout
+        manifestLoadingMaxRetry: 5,        // 5 reintentos
+        manifestLoadingRetryDelay: 1000,   // 1s entre reintentos
+        levelLoadingTimeOut: 20000,
+        levelLoadingMaxRetry: 5,
+        fragLoadingTimeOut: 30000,         // 30s para cargar fragmentos
+        fragLoadingMaxRetry: 6,
+        fragLoadingRetryDelay: 1000,
       });
 
       hls.loadSource(currentStream);
       hls.attachMedia(videoRef.current);
+      
+      // Forzar calidad inicial baja para carga rápida
+      hls.on(Hls.Events.LEVEL_LOADED, () => {
+        if (videoRef.current && hls.levels.length > 0) {
+          hls.nextLevel = 0;
+        }
+      });
+
+      // Monitorear buffer
+      hls.on(Hls.Events.BUFFER_CREATED, (event, data) => {
+        console.log('? Buffer creado:', data.tracks);
+      });
+
+      hls.on(Hls.Events.FRAG_BUFFERED, (event, data) => {
+        if (videoRef.current) {
+          const buffered = videoRef.current.buffered;
+          if (buffered.length > 0) {
+            const bufferedEnd = buffered.end(buffered.length - 1);
+            const currentTime = videoRef.current.currentTime;
+            const bufferAhead = bufferedEnd - currentTime;
+            console.log(`?? Buffer: ${bufferAhead.toFixed(1)}s ahead`);
+          }
+        }
+      });
       
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         videoRef.current?.play().catch(err => {
