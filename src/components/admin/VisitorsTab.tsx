@@ -1,7 +1,13 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense, lazy } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Globe, MapPin, Users, Crown, Clock } from "lucide-react";
-import VisitorMap from "./VisitorMap";
+
+// Carga el mapa de forma segura - si falla, no rompe la pestaña
+const VisitorMap = lazy(() => 
+  import("./VisitorMap").catch(() => ({
+    default: () => <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground">Mapa no disponible</div>
+  }))
+);
 
 interface VisitorLog {
   id: string;
@@ -40,13 +46,22 @@ const VisitorsTab = () => {
   }, []);
 
   const fetchVisitors = async () => {
-    const { data } = await supabase
-      .from("visitor_logs")
-      .select("*")
-      .order("visited_at", { ascending: false })
-      .limit(500);
-    setAllLogs((data as VisitorLog[]) || []);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from("visitor_logs")
+        .select("*")
+        .order("visited_at", { ascending: false })
+        .limit(500);
+      
+      if (error) {
+        console.error("Error fetching visitors:", error);
+      }
+      setAllLogs((data as VisitorLog[]) || []);
+    } catch (err) {
+      console.error("Error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const logs = useMemo(() => {
@@ -134,8 +149,14 @@ const VisitorsTab = () => {
         ))}
       </div>
 
-      {/* Map */}
-      <VisitorMap countryCounts={countryCounts} />
+      {/* Map - cargado de forma segura */}
+      <Suspense fallback={
+        <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground">
+          Cargando mapa...
+        </div>
+      }>
+        <VisitorMap countryCounts={countryCounts} />
+      </Suspense>
 
       {/* Top Countries & Cities */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
