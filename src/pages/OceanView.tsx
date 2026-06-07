@@ -343,19 +343,23 @@ const OceanView = () => {
   // Para streams HLS (.m3u8)
   if (isHlsStream && Hls.isSupported()) {
     const hls = new Hls({
-      enableWorker: true,
-      lowLatencyMode: false,
-      backBufferLength: BUFFER_SECONDS,
-      maxBufferLength: BUFFER_SECONDS,
-      maxMaxBufferLength: BUFFER_SECONDS,
-      maxBufferSize: 100 * 1024 * 1024,
-      maxBufferHole: 0.5,
-      highBufferWatchdogPeriod: 2,
-      nudgeOffset: 0.1,
-      nudgeMaxRetry: 5,
-      liveSyncDurationCount: BUFFER_SECONDS / 10,
-      liveDurationInfinity: true,
-    });
+  enableWorker: true,
+  lowLatencyMode: false,
+  backBufferLength: BUFFER_SECONDS,
+  maxBufferLength: BUFFER_SECONDS,
+  maxMaxBufferLength: BUFFER_SECONDS,
+  maxBufferSize: 100 * 1024 * 1024,
+  maxBufferHole: 0.5,
+  highBufferWatchdogPeriod: 2,
+  nudgeOffset: 0.1,
+  nudgeMaxRetry: 5,
+  liveSyncDurationCount: BUFFER_SECONDS / 10,
+  liveDurationInfinity: true,
+  // ← AGREGA ESTO PARA NGROK
+  xhrSetup: function(xhr, url) {
+    xhr.setRequestHeader('ngrok-skip-browser-warning', 'true');
+  }
+});
     
     hls.loadSource(playingUrl);
     hls.attachMedia(video);

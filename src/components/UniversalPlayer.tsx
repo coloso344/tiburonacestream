@@ -55,7 +55,10 @@ export default function UniversalPlayer() {
       const player = mpegts.createPlayer({
         type: 'mpegts',
         isLive: true,
-        url: url
+        url: url,
+        headers: {
+          'ngrok-skip-browser-warning': 'true'  // ? HEADER AGREGADO
+        }
       }, {
         enableWorker: true,
         enableStashBuffer: true,
