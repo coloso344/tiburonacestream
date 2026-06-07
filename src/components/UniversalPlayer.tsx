@@ -27,6 +27,8 @@ export default function UniversalPlayer() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentStream, setCurrentStream] = useState<string>('');
+  const [bufferStatus, setBufferStatus] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
 
@@ -48,41 +50,93 @@ export default function UniversalPlayer() {
 
     if (Hls.isSupported()) {
       const hls = new Hls({
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        maxBufferSize: 60 * 1000 * 1000,
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 2,
-        nudgeMaxRetry: 5,
+        // BUFFER MEGA GRANDE para streams en vivo
+        maxBufferLength: 120,
+        maxMaxBufferLength: 180,
+        maxBufferSize: 150 * 1000 * 1000,
+        
+        // Configuración para LIVE streaming
+        liveSyncDuration: 30,
+        liveMaxLatencyDuration: 60,
+        liveDurationInfinity: true,
+        
+        // Tolerancia extrema
+        maxBufferHole: 2.0,
+        maxFragLookUpTolerance: 0.5,
+        highBufferWatchdogPeriod: 5,
+        nudgeMaxRetry: 20,
+        
+        // Rendimiento
         enableWorker: true,
+        enableSoftwareAES: true,
         lowLatencyMode: false,
-        backBufferLength: 30,
+        backBufferLength: 90,
+        
+        // Calidad - empezar bajo y subir gradualmente
+        startLevel: -1,
+        capLevelToPlayerSize: true,
+        testBandwidth: true,
+        abrEwmaDefaultEstimate: 500000,
+        abrBandWidthFactor: 0.95,
+        abrBandWidthUpFactor: 0.7,
+        
+        // Timeouts largos
+        manifestLoadingTimeOut: 30000,
+        manifestLoadingMaxRetry: 10,
+        manifestLoadingRetryDelay: 2000,
+        levelLoadingTimeOut: 30000,
+        levelLoadingMaxRetry: 10,
+        fragLoadingTimeOut: 60000,
+        fragLoadingMaxRetry: 10,
+        fragLoadingRetryDelay: 2000,
       });
 
       hls.loadSource(currentStream);
       hls.attachMedia(videoRef.current);
       
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('? Manifest parsed, levels:', hls.levels.length);
         videoRef.current?.play().catch(err => {
           console.error('Error al reproducir:', err);
         });
       });
 
+      hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+        console.log(' Calidad cambiada a nivel:', data.level);
+      });
+
+      hls.on(Hls.Events.FRAG_BUFFERED, (event, data) => {
+        if (videoRef.current) {
+          const buffered = videoRef.current.buffered;
+          if (buffered.length > 0) {
+            const bufferedEnd = buffered.end(buffered.length - 1);
+            const currentTime = videoRef.current.currentTime;
+            const bufferAhead = bufferedEnd - currentTime;
+            setBufferStatus(bufferAhead);
+            console.log(` Buffer: ${bufferAhead.toFixed(1)}s`);
+          }
+        }
+      });
+
       hls.on(Hls.Events.ERROR, (event, data) => {
-        console.error('Error HLS:', data);
+        console.error('? Error HLS:', data.type, data.details);
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              console.log('Error de red, intentando reconectar...');
-              hls.startLoad();
+              console.log('?? Error de red, reconectando...');
+              setTimeout(() => hls.startLoad(), 3000);
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
-              console.log('Error de media, recuperando...');
+              console.log('?? Error de media, recuperando...');
               hls.recoverMediaError();
               break;
             default:
-              console.log('Error fatal, destruyendo HLS');
+              console.log('?? Error fatal, reiniciando...');
               hls.destroy();
+              setTimeout(() => {
+                setCurrentStream('');
+                setTimeout(() => setCurrentStream(currentStream), 100);
+              }, 2000);
               break;
           }
         }
@@ -98,6 +152,29 @@ export default function UniversalPlayer() {
       });
     }
   }, [currentStream]);
+
+  // Monitorear estado de reproducción
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleWaiting = () => console.log('? Buffering...');
+    const handlePlaying = () => console.log('?? Playing');
+
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('playing', handlePlaying);
+
+    return () => {
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('playing', handlePlaying);
+    };
+  }, []);
 
   const fetchActivePlaylists = async () => {
     const { data } = await supabase
@@ -205,6 +282,7 @@ export default function UniversalPlayer() {
 
   const playChannel = (channel: Channel) => {
     setCurrentStream(channel.url);
+    setBufferStatus(0);
   };
 
   return (
@@ -243,6 +321,24 @@ export default function UniversalPlayer() {
               
               {currentStream && (
                 <div className="mb-6">
+                  {/* Indicador de buffer */}
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-sm text-gray-400">Buffer:</span>
+                    <div className="flex-1 bg-gray-700 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all ${
+                          bufferStatus < 10 ? 'bg-red-500' :
+                          bufferStatus < 30 ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min((bufferStatus / 120) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-400 w-16">
+                      {bufferStatus.toFixed(1)}s
+                    </span>
+                  </div>
+                  
                   <video
                     ref={videoRef}
                     controls
