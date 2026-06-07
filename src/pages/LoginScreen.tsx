@@ -5,6 +5,28 @@ import { supabase } from "@/integrations/supabase/client";
 import SplashScreen from "@/components/SplashScreen";
 import cyberSharkCover from "@/assets/cyber-shark-cover.png";
 
+// === FUNCIÓN DE TRACKING ===
+const trackVisit = async (accessLevel: string) => {
+  try {
+    // Obtener IP y ubicación (gratis, sin API key)
+    const geoRes = await fetch("https://ipapi.co/json/");
+    const geo = await geoRes.json();
+    
+    await supabase.from("visitor_logs").insert([{
+      ip_address: geo.ip || "unknown",
+      country: geo.country_name || null,
+      city: geo.city || null,
+      region: geo.region || null,
+      access_level: accessLevel,
+      visited_at: new Date().toISOString(),
+    }]);
+    
+    console.log("✅ Visita registrada:", accessLevel, geo.city, geo.country_name);
+  } catch (err) {
+    console.error("❌ Error tracking:", err);
+  }
+};
+
 const LoginScreen = () => {
   const [showSplash, setShowSplash] = useState(() => {
     return !sessionStorage.getItem("splashSeen");
@@ -20,6 +42,7 @@ const LoginScreen = () => {
       return () => window.removeEventListener("splash-done", handler);
     }
   }, [showSplash]);
+  
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [shaking, setShaking] = useState(false);
@@ -30,21 +53,21 @@ const LoginScreen = () => {
     
     if (code === "ROXI.4818") {
         sessionStorage.setItem("access", "visitor");
-        // supabase.functions.invoke("visitor-tracker", { body: { access_level: "visitor" } });
+        trackVisit("visitor");
         navigate("/ocean");
         return;
     }
     
     if (code === "borico344") {
         sessionStorage.setItem("access", "premium");
-        // supabase.functions.invoke("visitor-tracker", { body: { access_level: "premium" } });
+        trackVisit("premium");
         navigate("/ocean");
         return;
     }
     
     if (code === "lucifer.4818") {
         sessionStorage.setItem("access", "admin");
-        // supabase.functions.invoke("visitor-tracker", { body: { access_level: "admin" } });
+        trackVisit("admin");
         navigate("/admin");
         return;
     }
@@ -59,7 +82,7 @@ const LoginScreen = () => {
     if (!dbError && data && new Date(data.expires_at) > new Date()) {
         const level = data.access_level || "visitor";
         sessionStorage.setItem("access", level);
-        // supabase.functions.invoke("visitor-tracker", { body: { access_level: level } });
+        trackVisit(level);
         navigate(level === "admin" ? "/admin" : "/ocean");
         return;
     }
@@ -67,7 +90,7 @@ const LoginScreen = () => {
     setError("Código incorrecto o expirado");
     setShaking(true);
     setTimeout(() => setShaking(false), 500);
-};
+  };
 
   return (
     <>
