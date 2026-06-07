@@ -222,7 +222,7 @@ const OceanView = () => {
     const base = String(rawUrl).trim();
     const normalizedUrl = /^https?:\/\//i.test(base) ? base : `http://${base}`;
 
-    const PROXY_URL = "https://forth-gst-optimize-agency.trycloudflare.com";
+    const PROXY_URL = "https://pacifier-uplifting-eskimo.ngrok-free.dev";
 
     const proxyStreamUrl = `${PROXY_URL}/stream?server_url=${encodeURIComponent(normalizedUrl)}&username=${encodeURIComponent(selectedXtream.username)}&password=${encodeURIComponent(selectedXtream.password)}&stream_id=${channel.stream_id}`;
 

@@ -127,7 +127,7 @@ export default function UniversalPlayer() {
 
     const channels = data.map((stream: any) => ({
       name: stream.name,
-      url: `http://localhost:3000/stream?server_url=${encodeURIComponent(playlist.server_url)}&username=${playlist.username}&password=${playlist.password}&stream_id=${stream.stream_id}`,
+      url: `https://pacifier-uplifting-eskimo.ngrok-free.dev/stream?server_url=${encodeURIComponent(playlist.server_url)}&username=${playlist.username}&password=${playlist.password}&stream_id=${stream.stream_id}`,
       logo: stream.stream_icon,
       group: stream.category_name
     }));
