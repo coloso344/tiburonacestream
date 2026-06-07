@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import mpegts from 'mpegts.js';
 
 interface Playlist {
   id: string;
@@ -25,10 +26,51 @@ export default function UniversalPlayer() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentStream, setCurrentStream] = useState<string>('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<mpegts.Player | null>(null);
 
   useEffect(() => {
     fetchActivePlaylists();
+    return () => {
+      if (playerRef.current) {
+        playerRef.current.destroy();
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    if (currentStream && videoRef.current) {
+      playStream(currentStream);
+    }
+  }, [currentStream]);
+
+  const playStream = (url: string) => {
+    // Destruir player anterior si existe
+    if (playerRef.current) {
+      playerRef.current.destroy();
+      playerRef.current = null;
+    }
+
+    if (mpegts.isSupported() && videoRef.current) {
+      const player = mpegts.createPlayer({
+        type: 'mpegts',
+        isLive: true,
+        url: url
+      }, {
+        enableWorker: true,
+        enableStashBuffer: true,
+        stashInitialSize: 128 * 1024,
+        liveBufferLatencyChasing: true,
+        liveBufferLatencyMaxLatency: 1.5
+      });
+
+      player.attachMediaElement(videoRef.current);
+      player.load();
+      player.play();
+      
+      playerRef.current = player;
+    }
+  };
 
   const fetchActivePlaylists = async () => {
     const { data } = await supabase
@@ -61,7 +103,6 @@ export default function UniversalPlayer() {
   };
 
   const loadM3U = async (playlist: Playlist) => {
-    // Usar el proxy de Supabase
     const { data, error } = await supabase.functions.invoke('fetch-m3u', {
       body: { url: playlist.url }
     });
@@ -179,7 +220,7 @@ export default function UniversalPlayer() {
               {currentStream && (
                 <div className="mb-6">
                   <video
-                    src={currentStream}
+                    ref={videoRef}
                     controls
                     autoPlay
                     className="w-full max-h-[600px] bg-black rounded"
