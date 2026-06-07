@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import Hls from 'hls.js';
 
 interface Playlist {
   id: string;
@@ -9,6 +10,7 @@ interface Playlist {
   username?: string;
   password?: string;
   url?: string;
+  mac_address?: string;
   is_active: boolean;
 }
 
@@ -25,10 +27,80 @@ export default function UniversalPlayer() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentStream, setCurrentStream] = useState<string>('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
   useEffect(() => {
     fetchActivePlaylists();
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    if (!currentStream || !videoRef.current) return;
+
+    // Limpiar instancia anterior
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+    }
+
+    // Configurar HLS.js con buffer optimizado
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 60 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 2,
+        nudgeMaxRetry: 5,
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 30,
+      });
+
+      hls.loadSource(currentStream);
+      hls.attachMedia(videoRef.current);
+      
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        videoRef.current?.play().catch(err => {
+          console.error('Error al reproducir:', err);
+        });
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error('Error HLS:', data);
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.log('Error de red, intentando reconectar...');
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.log('Error de media, recuperando...');
+              hls.recoverMediaError();
+              break;
+            default:
+              console.log('Error fatal, destruyendo HLS');
+              hls.destroy();
+              break;
+          }
+        }
+      });
+
+      hlsRef.current = hls;
+    } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari nativo
+      videoRef.current.src = currentStream;
+      videoRef.current.addEventListener('loadedmetadata', () => {
+        videoRef.current?.play().catch(err => {
+          console.error('Error al reproducir:', err);
+        });
+      });
+    }
+  }, [currentStream]);
 
   const fetchActivePlaylists = async () => {
     const { data } = await supabase
@@ -61,7 +133,6 @@ export default function UniversalPlayer() {
   };
 
   const loadM3U = async (playlist: Playlist) => {
-    // Usar el proxy de Supabase
     const { data, error } = await supabase.functions.invoke('fetch-m3u', {
       body: { url: playlist.url }
     });
@@ -179,7 +250,7 @@ export default function UniversalPlayer() {
               {currentStream && (
                 <div className="mb-6">
                   <video
-                    src={currentStream}
+                    ref={videoRef}
                     controls
                     autoPlay
                     className="w-full max-h-[600px] bg-black rounded"
