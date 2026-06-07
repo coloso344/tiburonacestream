@@ -1,0 +1,11 @@
+[[redirects]]
+  from = "/xtream-proxy/*"
+  to = "http://p2premium.club"
+  status = 200
+  force = true
+
+
+[[redirects]]
+  from = '/*'
+  to = '/index.html'
+  status = 200
