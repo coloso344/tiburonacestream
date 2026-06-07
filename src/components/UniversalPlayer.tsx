@@ -86,7 +86,7 @@ export default function UniversalPlayer() {
 
     const channels = data.map((stream: any) => ({
       name: stream.name,
-      url: `${playlist.server_url}/live/${playlist.username}/${playlist.password}/${stream.stream_id}.m3u8`,
+      url: `https://nice-funk-owen-liberty.trycloudflare.com/stream?server_url=${encodeURIComponent(playlist.server_url)}&username=${playlist.username}&password=${playlist.password}&stream_id=${stream.stream_id}`,
       logo: stream.stream_icon,
       group: stream.category_name
     }));
