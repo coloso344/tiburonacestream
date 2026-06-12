@@ -51,7 +51,7 @@ const LoginScreen = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (code === "ROXI.4818") {
+    if (code === "PANTUFLAS.1873") {
         sessionStorage.setItem("access", "visitor");
         trackVisit("visitor");
         navigate("/ocean");
